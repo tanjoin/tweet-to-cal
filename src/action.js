@@ -13,18 +13,17 @@ async function openCal() {
       !document.querySelector(SELECTOR_CONTENT).innerText.includes('返信先')) {
     TEXT = document.querySelector(SELECTOR_CONTENT).innerText + NL;
     let urls = [...document.querySelectorAll(`${SELECTOR_CONTENT} a`)].map((a) => a.href).filter((url) => !url.includes('hashtag'));
-    let expandedUrls = [];
     for (let i = 0; i < urls.length; i++) {
       let expandedUrl = await tenkai(urls[i]);
       if (expandedUrl) {
         urls[i] = expandedUrl;
       }      
     }
-    TEXT += NL + urls.join(NL) + NL + expandedUrls.join(NL) + NL;
+    TEXT += NL + urls.join(NL) + NL;
   }
 
   const TWEET_URL = window.location.href;
-  
+
   const DATE = new Date().toISOString().replaceAll(/[/.:-]/g, '');
   let startDate = DATE;
   let endDate = DATE;
@@ -40,7 +39,7 @@ async function openCal() {
                     .replace(/月/g, '/')
                     .replace(/日/g, ' ')
                     .match(/(([0-9]+)?\/?([0-9]+)\/([0-9]+) +([0-9]+):([0-9]+))/g);
-  if (contentDates.length >= 2) {
+  if (contentDates?.length >= 2) {
     if (contentDates[0].split('/').length === 2) {
       contentDates[0] = new Date().getFullYear() + "/" + contentDates[0];
     }
@@ -50,7 +49,6 @@ async function openCal() {
     startDate = new Date(contentDates[0]).toISOString().replaceAll(/[/.:-]/g, '');
     endDate   = new Date(contentDates[1]).toISOString().replaceAll(/[/.:-]/g, '');
   }
-
   var url = BASE_URL + encodeURIComponent(TITLE) + "&details=" + encodeURIComponent(TEXT) + "&location=" + encodeURIComponent(TWEET_URL) + "&dates=" + startDate + "%2F" + endDate;
   open(url, "_blank");
 }
@@ -89,6 +87,8 @@ function tenkai(url) {
             resolve("展開できません");
           }
           break;
+        default:
+          resolve(null);
       }
     };
     req.open('GET', url);
