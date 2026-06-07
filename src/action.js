@@ -35,121 +35,155 @@ async function openCal() {
   
     const TWEET_URL = window.location.href;
   
-    // --- 2. 日時抽出および選択ダイアログ処理 ---
-    let startDateObj = new Date(); // デフォルト
-    let endDateObj = null;
+    // --- 2. 修正版・高精度日時抽出ロジック ---
+    let startStr = "";
+    let endStr = "";
 
     if (contentElem) {
       const rawText = contentElem.innerText;
-      // テキストから日時候補をラベル（昼の部 開場など）付きで抽出
-      const candidates = parseAllDateTimeCandidates(rawText);
+      const candidates = parseFlexibleDateTime(rawText, eventDuration);
 
       if (candidates.length > 0) {
-        let selectedCandidate = candidates[0];
+        let selected = candidates[0];
 
-        // 候補が複数ある場合はダイアログを出して選択させる
+        // 候補が複数ある場合はダイアログで選択
         if (candidates.length > 1) {
-          let promptMessage = "登録したい日時を選択してください（番号を入力）:\n";
+          let promptMessage = "登録したい日時パターンを選択してください（番号を入力）:\n";
           candidates.forEach((c, index) => {
-            promptMessage += `${index + 1}: ${c.label} (${c.date.toLocaleString('ja-JP')})\n`;
+            promptMessage += `${index + 1}: ${c.label}\n`;
           });
           
           const userInput = prompt(promptMessage, "1");
-          if (userInput === null) {
-            return; // キャンセルされた場合は処理を中断
-          }
+          if (userInput === null) return; // キャンセル時
+          
           const selectedIndex = parseInt(userInput, 10) - 1;
           if (selectedIndex >= 0 && selectedIndex < candidates.length) {
-            selectedCandidate = candidates[selectedIndex];
+            selected = candidates[selectedIndex];
           }
         }
 
-        startDateObj = selectedCandidate.date;
+        startStr = selected.startStr;
+        endStr = selected.endStr;
       }
     }
 
-    // 選択された開始時間から、設定されたeventDuration（時間）を足して終了時刻とする
-    endDateObj = new Date(startDateObj.getTime());
-    endDateObj.setHours(endDateObj.getHours() + Number(eventDuration));
-
-    // Googleカレンダー用のフォーマット（YYYYMMDDTHHmmSSZ）に変換
-    const formatGoogleDate = (date) => {
-      return date.toISOString().replaceAll(/[-:]/g, '').split('.')[0] + 'Z';
-    };
-
-    const startDateStr = formatGoogleDate(startDateObj);
-    const endDateStr = formatGoogleDate(endDateObj);
+    // 日時が全く取得できなかった場合のフォールバック（現在時刻から2時間）
+    if (!startStr || !endStr) {
+      const now = new Date();
+      const future = new Date(now.getTime() + eventDuration * 60 * 60 * 1000);
+      const formatG = (d) => d.toISOString().replaceAll(/[-:]/g, '').split('.')[0] + 'Z';
+      startStr = formatG(now);
+      endStr = formatG(future);
+    }
   
-    var url = BASE_URL + encodeURIComponent(TITLE) + "&details=" + encodeURIComponent(TEXT) + "&location=" + encodeURIComponent(TWEET_URL) + "&dates=" + startDateStr + "%2F" + endDateStr;
+    var url = BASE_URL + encodeURIComponent(TITLE) + "&details=" + encodeURIComponent(TEXT) + "&location=" + encodeURIComponent(TWEET_URL) + "&dates=" + startStr + "%2F" + endStr;
     open(url, "_blank");
   }
 }
 
 /**
- * テキストから「日付」と「時間」の組み合わせをすべて抽出し、
- * 直前にある文脈（昼の部、開場、開演など）をラベルにして返す関数
+ * テキストから日付や時間を柔軟に解析し、Googleカレンダー形式の文字列ペアを返す
  */
-function parseAllDateTimeCandidates(text) {
+function parseFlexibleDateTime(text, defaultDurationHours) {
   const currentYear = new Date().getFullYear();
   
-  // 曜日表記を消去
-  const cleanText = text.replace(/\([日月火水木金土]\)/g, ' ');
+  // 曜日表記「(金)」「（木）」や、全角スペースなどを標準化
+  const cleanText = text.replace(/\([日月火水木金土]\)/g, ' ')
+                        .replace(/（[日月火水木金土]）/g, ' ')
+                        .replace(/\s+/g, ' ');
 
-  // 1. まずテキスト全体から「日付（月日）」の情報を探す
-  // 例: 「5月16日」「05/16」
-  const dateRegex = /([0-9]{4})[\/\.\-\s年]([0-9]{1,2})[\/\.\-\s月]([0-9]{1,2})日?|([0-9]{1,2})[\/\.\-\s月]([0-9]{1,2})日?/g;
-  
-  let dateMatches = [];
-  let dateMatch;
-  while ((dateMatch = dateRegex.exec(cleanText)) !== null) {
-    let year = currentYear;
-    let month, day;
-    
-    if (dateMatch[1]) { // 年がある場合
-      year = parseInt(dateMatch[1], 10);
-      month = parseInt(dateMatch[2], 10) - 1;
-      day = parseInt(dateMatch[3], 10);
-    } else { // 年がない場合
-      month = parseInt(dateMatch[4], 10) - 1;
-      day = parseInt(dateMatch[5], 10);
-    }
-    dateMatches.push({ year, month, day, index: dateMatch.index, text: dateMatch[0] });
+  // 1. 日付の抽出 (YYYY/MM/DD, MM/DD, MM月DD日 など)
+  const dateRegex = /(([0-9]{4})[\/\.\-年])?([0-9]{1,2})[\/\.\-月]([0-9]{1,2})日?/g;
+  let dates = [];
+  let match;
+  while ((match = dateRegex.exec(cleanText)) !== null) {
+    let year = match[2] ? parseInt(match[2], 10) : currentYear;
+    let month = parseInt(match[3], 10) - 1; // 0ベース化
+    let day = parseInt(match[4], 10);
+    dates.push({ year, month, day, index: match.index, raw: match[0] });
   }
 
-  // 日付が1つも見つからない場合は空で返す
-  if (dateMatches.length === 0) return [];
-
-  // 2. 「時刻（HH:MM）」を探す
-  // 直前20文字程度を切り取って「昼の部 開場」などのラベルにする
+  // 2. 時刻の抽出 (HH:MM)
   const timeRegex = /([0-9]{1,2}):([0-9]{2})/g;
+  let times = [];
+  while ((match = timeRegex.exec(cleanText)) !== null) {
+    times.push({
+      hour: parseInt(match[1], 10),
+      minute: parseInt(match[2], 10),
+      index: match.index,
+      raw: match[0]
+    });
+  }
+
+  // Googleカレンダー用のフォーマット関数
+  // タイムゾーンによる日付ズレを防ぐため、端末のローカル時間ベースでISO（UTC）に変換
+  const formatGoogleDate = (d) => d.toISOString().replaceAll(/[-:]/g, '').split('.')[0] + 'Z';
+  const formatGoogleAllDay = (d) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}${m}${day}`;
+  };
+
   let candidates = [];
-  let timeMatch;
 
-  while ((timeMatch = timeRegex.exec(cleanText)) !== null) {
-    const hour = parseInt(timeMatch[1], 10);
-    const minute = parseInt(timeMatch[2], 10);
+  // --- パターンA: 期間表現（〜 や -）があり、日付が2つ以上抽出されている場合 ---
+  if (dates.length >= 2 && /[～~~\-ー〜]/.test(cleanText)) {
+    // 期間内に「時刻指定」が特に含まれていない場合、終日イベントとして処理
+    if (times.length === 0) {
+      const d1 = new Date(dates[0].year, dates[0].month, dates[0].day);
+      const d2 = new Date(dates[1].year, dates[1].month, dates[1].day);
+      
+      // Googleカレンダーの終日イベント仕様：終了日は「その日の翌日」を指定すると、その日まで枠が塗られる
+      d2.setDate(d2.getDate() + 1);
 
-    // この時刻の直前にあるテキストをラベルとして抽出（最大15文字）
-    const startIdx = Math.max(0, timeMatch.index - 15);
-    const labelContext = cleanText.substring(startIdx, timeMatch.index).trim().replace(/\s+/g, ' ');
-
-    // 最も近い位置にある（基本的には直前にある）日付を紐付ける
-    let targetDate = dateMatches[0];
-    for (let d of dateMatches) {
-      if (d.index <= timeMatch.index) {
-        targetDate = d;
-      } else {
-        break;
-      }
-    }
-
-    const parsedDate = new Date(targetDate.year, targetDate.month, targetDate.day, hour, minute);
-    if (!isNaN(parsedDate.getTime())) {
       candidates.push({
-        date: parsedDate,
-        label: labelContext || "時刻"
+        label: `【期間・終日】 ${dates[0].raw} ～ ${dates[1].raw}`,
+        startStr: formatGoogleAllDay(d1),
+        endStr: formatGoogleAllDay(d2)
       });
     }
+  }
+
+  // --- パターンB: 時刻をもとにした時間指定イベント候補の作成 ---
+  if (times.length > 0) {
+    times.forEach((t) => {
+      // 最も適切な日付（時刻の直前に位置する日付）を探索
+      let targetDate = dates[0] || { year: currentYear, month: new Date().getMonth(), day: new Date().getDate(), raw: "" };
+      for (let d of dates) {
+        if (d.index <= t.index) {
+          targetDate = d;
+        } else {
+          break;
+        }
+      }
+
+      const startIdx = Math.max(0, t.index - 12);
+      const labelContext = cleanText.substring(startIdx, t.index).trim();
+
+      const startDateObj = new Date(targetDate.year, targetDate.month, targetDate.day, t.hour, t.minute);
+      const endDateObj = new Date(startDateObj.getTime() + defaultDurationHours * 60 * 60 * 1000);
+
+      candidates.push({
+        label: `【時間指定】 ${targetDate.raw ? targetDate.raw + ' ' : ''}${labelContext}${t.raw}`,
+        startStr: formatGoogleDate(startDateObj),
+        endStr: formatGoogleDate(endDateObj)
+      });
+    });
+  }
+
+  // --- パターンC: 日付はあるが時刻が一切ない単発の場合 ---
+  if (dates.length > 0 && times.length === 0 && candidates.length === 0) {
+    dates.forEach((d) => {
+      const d1 = new Date(d.year, d.month, d.day);
+      const d2 = new Date(d.year, d.month, d.day + 1);
+
+      candidates.push({
+        label: `【単発・終日】 ${d.raw}`,
+        startStr: formatGoogleAllDay(d1),
+        endStr: formatGoogleAllDay(d2)
+      });
+    });
   }
 
   return candidates;
