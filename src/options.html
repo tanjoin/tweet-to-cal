@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>設定 - X to Calendar</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      padding: 20px;
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #f5f5f5;
+    }
+    
+    .container {
+      background-color: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    
+    h1 {
+      font-size: 24px;
+      margin-bottom: 20px;
+      color: #333;
+    }
+    
+    .setting-group {
+      margin-bottom: 30px;
+    }
+    
+    label {
+      display: block;
+      font-weight: 500;
+      margin-bottom: 10px;
+      color: #555;
+    }
+    
+    select {
+      width: 100%;
+      padding: 10px;
+      font-size: 16px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      background-color: white;
+      cursor: pointer;
+    }
+    
+    select:focus {
+      outline: none;
+      border-color: #4285f4;
+      box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.1);
+    }
+    
+    .description {
+      font-size: 14px;
+      color: #666;
+      margin-top: 8px;
+    }
+    
+    .save-button {
+      background-color: #4285f4;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      font-size: 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    
+    .save-button:hover {
+      background-color: #3367d6;
+    }
+    
+    .save-button:active {
+      background-color: #2851a3;
+    }
+    
+    .status-message {
+      margin-top: 15px;
+      padding: 10px;
+      border-radius: 4px;
+      display: none;
+    }
+    
+    .status-message.success {
+      background-color: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    
+    .status-message.show {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>設定</h1>
+    
+    <div class="setting-group">
+      <label for="eventDuration">イベントの長さ</label>
+      <select id="eventDuration">
+        <option value="0">0分</option>
+        <option value="0.5">30分</option>
+        <option value="1">1時間</option>
+        <option value="1.5">1時間30分</option>
+        <option value="2">2時間</option>
+        <option value="2.5">2時間30分</option>
+        <option value="3">3時間</option>
+        <option value="3.5">3時間30分</option>
+        <option value="4">4時間</option>
+        <option value="4.5">4時間30分</option>
+        <option value="5">5時間</option>
+        <option value="5.5">5時間30分</option>
+        <option value="6">6時間</option>
+        <option value="6.5">6時間30分</option>
+        <option value="7">7時間</option>
+        <option value="7.5">7時間30分</option>
+        <option value="8">8時間</option>
+        <option value="8.5">8時間30分</option>
+        <option value="9">9時間</option>
+        <option value="9.5">9時間30分</option>
+        <option value="10">10時間</option>
+        <option value="10.5">10時間30分</option>
+        <option value="11">11時間</option>
+        <option value="11.5">11時間30分</option>
+        <option value="12">12時間</option>
+        <option value="12.5">12時間30分</option>
+        <option value="13">13時間</option>
+        <option value="13.5">13時間30分</option>
+        <option value="14">14時間</option>
+        <option value="14.5">14時間30分</option>
+        <option value="15">15時間</option>
+        <option value="15.5">15時間30分</option>
+        <option value="16">16時間</option>
+        <option value="16.5">16時間30分</option>
+        <option value="17">17時間</option>
+        <option value="17.5">17時間30分</option>
+        <option value="18">18時間</option>
+        <option value="18.5">18時間30分</option>
+        <option value="19">19時間</option>
+        <option value="19.5">19時間30分</option>
+        <option value="20">20時間</option>
+        <option value="20.5">20時間30分</option>
+        <option value="21">21時間</option>
+        <option value="21.5">21時間30分</option>
+        <option value="22">22時間</option>
+        <option value="22.5">22時間30分</option>
+        <option value="23">23時間</option>
+        <option value="23.5">23時間30分</option>
+        <option value="24">24時間</option>
+      </select>
+      <div class="description">
+        カレンダーに作成されるイベントの長さを設定します。開始時刻と終了時刻の差がこの時間になります。
+      </div>
+    </div>
+    
+    <button id="saveButton" class="save-button">保存</button>
+    
+    <div id="statusMessage" class="status-message"></div>
+  </div>
+  
+  <script src="options.js"></script>
+</body>
+</html>

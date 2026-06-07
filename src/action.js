@@ -3,16 +3,26 @@ async function openCal() {
     const BASE_URL = "https://www.google.com/calendar/render?action=TEMPLATE&text=";
     const NL = "\n";
     const SELECTOR_CONTENT = 'article > div > div > div:nth-child(3) > div:nth-child(1)';
-    
+    const DEFAULT_EVENT_DURATION = 2;
+
+    // 1. chrome.storage から設定を取得（なければデフォルト値）
+    let eventDuration = DEFAULT_EVENT_DURATION;
+    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
+      const storageData = await new Promise((resolve) => {
+        chrome.storage.sync.get({ eventDuration: DEFAULT_EVENT_DURATION }, resolve);
+      });
+      eventDuration = storageData.eventDuration;
+    }
+
     let TITLE = "予定あり";
-    if (document.querySelector(SELECTOR_CONTENT)) {
-      TITLE = document.querySelector(SELECTOR_CONTENT).innerText.split('\n').shift();
+    const contentElem = document.querySelector(SELECTOR_CONTENT);
+    if (contentElem) {
+      TITLE = contentElem.innerText.split('\n').shift();
     }
   
     let TEXT = "";
-    if (document.querySelector(SELECTOR_CONTENT) && 
-        !document.querySelector(SELECTOR_CONTENT).innerText.includes('返信先')) {
-      TEXT = document.querySelector(SELECTOR_CONTENT).innerText + NL;
+    if (contentElem && !contentElem.innerText.includes('返信先')) {
+      TEXT = contentElem.innerText + NL;
       let urls = [...document.querySelectorAll(`${SELECTOR_CONTENT} a`)].map((a) => a.href).filter((url) => !url.includes('hashtag'));
       for (let i = 0; i < urls.length; i++) {
         let expandedUrl = await tenkai(urls[i]);
@@ -25,39 +35,75 @@ async function openCal() {
   
     const TWEET_URL = window.location.href;
   
-    const DATE = new Date().toISOString().replaceAll(/[/.:-]/g, '');
-    let startDate = DATE;
-    let endDate = DATE;
-    let contentDates = document.querySelector(SELECTOR_CONTENT).innerHTML
-                      .replace(/\(日\)/g, ' ')
-                      .replace(/\(月\)/g, ' ')
-                      .replace(/\(火\)/g, ' ')
-                      .replace(/\(水\)/g, ' ')
-                      .replace(/\(木\)/g, ' ')
-                      .replace(/\(金\)/g, ' ')
-                      .replace(/\(土\)/g, ' ')
-                      .replace(/年/g, '/')
-                      .replace(/月/g, '/')
-                      .replace(/日/g, ' ')
-                      .match(/(([0-9]+)?\/?([0-9]+)\/([0-9]+) +([0-9]+):([0-9]+))/g);
-    if (contentDates?.length >= 2) {
-      if (contentDates[0].split('/').length === 2) {
-        contentDates[0] = new Date().getFullYear() + "/" + contentDates[0];
+    // --- 2. 日時抽出・パース処理の刷新 ---
+    let startDateObj = new Date(); // デフォルトは現在時刻
+    let endDateObj = null;
+
+    if (contentElem) {
+      const rawText = contentElem.innerText;
+      const dates = parseDatesFromText(rawText);
+
+      if (dates.length >= 1) {
+        startDateObj = dates[0];
+        if (dates.length >= 2) {
+          endDateObj = dates[1];
+        }
       }
-      if (contentDates[1].split('/').length === 2) {
-        contentDates[1] = new Date().getFullYear() + "/" + contentDates[1];
-      }
-      startDate = new Date(contentDates[0]).toISOString().replaceAll(/[/.:-]/g, '');
-      endDate   = new Date(contentDates[1]).toISOString().replaceAll(/[/.:-]/g, '');
     }
-    var url = BASE_URL + encodeURIComponent(TITLE) + "&details=" + encodeURIComponent(TEXT) + "&location=" + encodeURIComponent(TWEET_URL) + "&dates=" + startDate + "%2F" + endDate;
+
+    // 終了時刻がない場合、設定されたeventDuration（時間）を足す
+    if (!endDateObj) {
+      endDateObj = new Date(startDateObj.getTime());
+      endDateObj.setHours(endDateObj.getHours() + Number(eventDuration));
+    }
+
+    // Googleカレンダー用のフォーマット（YYYYMMDDTHHmmSSZ）に変換する関数
+    const formatGoogleDate = (date) => {
+      return date.toISOString().replaceAll(/[-:]/g, '').split('.')[0] + 'Z';
+    };
+
+    const startDateStr = formatGoogleDate(startDateObj);
+    const endDateStr = formatGoogleDate(endDateObj);
+  
+    var url = BASE_URL + encodeURIComponent(TITLE) + "&details=" + encodeURIComponent(TEXT) + "&location=" + encodeURIComponent(TWEET_URL) + "&dates=" + startDateStr + "%2F" + endDateStr;
     open(url, "_blank");
   }
 }
 
+/**
+ * テキストから日時を高度に抽出する関数
+ * 「2026/06/07 15:00」「12月25日 19:30」「06-07 12:00」などの表記に対応
+ */
+function parseDatesFromText(text) {
+  const currentYear = new Date().getFullYear();
+  // 曜日表記（(月), (text)など）をあらかじめ一掃
+  const cleanText = text.replace(/\([日月火水木金土]\)/g, ' ');
+
+  // 様々な日時パターンにマッチする正規表現
+  // 例: 2026/06/07 12:00, 6月7日 12:00, 06-07 12:00 など
+  const dateTimeRegex = /(([0-9]{4})[\/\.\-\s年])?([0-9]{1,2})[\/\.\-\s月]([0-9]{1,2})[日\s]+([0-9]{1,2}):([0-9]{2})/g;
+  
+  let matches = [];
+  let match;
+  
+  while ((match = dateTimeRegex.exec(cleanText)) !== null) {
+    let year = match[2] ? parseInt(match[2], 10) : currentYear;
+    let month = parseInt(match[3], 10) - 1; // Date型は0始まり
+    let day = parseInt(match[4], 10);
+    let hour = parseInt(match[5], 10);
+    let minute = parseInt(match[6], 10);
+
+    const parsedDate = new Date(year, month, day, hour, minute);
+    if (!isNaN(parsedDate.getTime())) {
+      matches.push(parsedDate);
+    }
+  }
+  return matches;
+}
+
+// 展開処理
 function tenkai(url) {
   return new Promise((resolve, reject) => {
-
     let req = new XMLHttpRequest();
     req.onreadystatechange = () => {
       switch (req.readyState) {
@@ -89,4 +135,5 @@ function tenkai(url) {
     req.send();
   });
 }
+
 openCal();

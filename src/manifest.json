@@ -1,6 +1,6 @@
 {
   "name": "ツイートからカレンダー作成しようとするやつ",
-  "version": "2024.06.06",
+  "version": "2026.6.7",
   "manifest_version": 3,
   "description": "ツイートからGoogleカレンダー作成するときにちょっとだけ便利な拡張機能。ツイートの内容とリンクを自動で書いてくれます。",
   "icons": {
@@ -8,7 +8,12 @@
     "48": "img/48.png",
     "16": "img/16.png"
   },
-  "permissions": ["tabs", "activeTab", "scripting"],
+  "permissions": [
+    "tabs", 
+    "activeTab", 
+    "scripting",
+    "storage"
+  ],
   "host_permissions": [
     "http://twitter.com/*/status/*", 
     "https://twitter.com/*/status/*",
@@ -22,5 +27,9 @@
   "background": {
     "service_worker": "background.js",
     "presistent" : false
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
   }
 }
