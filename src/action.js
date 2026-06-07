@@ -35,7 +35,7 @@ async function openCal() {
   
     const TWEET_URL = window.location.href;
   
-    // --- 2. 修正版・高精度日時抽出ロジック ---
+    // --- 2. 高精度日時抽出ロジック（「まで」対応版） ---
     let startStr = "";
     let endStr = "";
 
@@ -98,7 +98,7 @@ function parseFlexibleDateTime(text, defaultDurationHours) {
   let match;
   while ((match = dateRegex.exec(cleanText)) !== null) {
     let year = match[2] ? parseInt(match[2], 10) : currentYear;
-    let month = parseInt(match[3], 10) - 1; // 0ベース化
+    let month = parseInt(match[3], 10) - 1;
     let day = parseInt(match[4], 10);
     dates.push({ year, month, day, index: match.index, raw: match[0] });
   }
@@ -116,7 +116,6 @@ function parseFlexibleDateTime(text, defaultDurationHours) {
   }
 
   // Googleカレンダー用のフォーマット関数
-  // タイムゾーンによる日付ズレを防ぐため、端末のローカル時間ベースでISO（UTC）に変換
   const formatGoogleDate = (d) => d.toISOString().replaceAll(/[-:]/g, '').split('.')[0] + 'Z';
   const formatGoogleAllDay = (d) => {
     const y = d.getFullYear();
@@ -129,12 +128,9 @@ function parseFlexibleDateTime(text, defaultDurationHours) {
 
   // --- パターンA: 期間表現（〜 や -）があり、日付が2つ以上抽出されている場合 ---
   if (dates.length >= 2 && /[～~~\-ー〜]/.test(cleanText)) {
-    // 期間内に「時刻指定」が特に含まれていない場合、終日イベントとして処理
     if (times.length === 0) {
       const d1 = new Date(dates[0].year, dates[0].month, dates[0].day);
       const d2 = new Date(dates[1].year, dates[1].month, dates[1].day);
-      
-      // Googleカレンダーの終日イベント仕様：終了日は「その日の翌日」を指定すると、その日まで枠が塗られる
       d2.setDate(d2.getDate() + 1);
 
       candidates.push({
@@ -158,14 +154,30 @@ function parseFlexibleDateTime(text, defaultDurationHours) {
         }
       }
 
+      // 時刻の直後（最大8文字以内）に「まで」というキーワードがあるかチェック
+      const postText = cleanText.substring(t.index + t.raw.length, t.index + t.raw.length + 8);
+      const isDeadline = postText.includes("まで");
+
       const startIdx = Math.max(0, t.index - 12);
       const labelContext = cleanText.substring(startIdx, t.index).trim();
 
-      const startDateObj = new Date(targetDate.year, targetDate.month, targetDate.day, t.hour, t.minute);
-      const endDateObj = new Date(startDateObj.getTime() + defaultDurationHours * 60 * 60 * 1000);
+      let startDateObj, endDateObj;
+
+      if (isDeadline) {
+        // 「まで」の場合：抽出した時刻を【終了時間】にする
+        endDateObj = new Date(targetDate.year, targetDate.month, targetDate.day, t.hour, t.minute);
+        // 終了時間から eventDuration（時間）を引き算して【開始時間】にする
+        startDateObj = new Date(endDateObj.getTime() - defaultDurationHours * 60 * 60 * 1000);
+      } else {
+        // 通常の場合：抽出した時刻を【開始時間】にする
+        startDateObj = new Date(targetDate.year, targetDate.month, targetDate.day, t.hour, t.minute);
+        endDateObj = new Date(startDateObj.getTime() + defaultDurationHours * 60 * 60 * 1000);
+      }
+
+      const labelType = isDeadline ? "【締切・時間指定】" : "【時間指定】";
 
       candidates.push({
-        label: `【時間指定】 ${targetDate.raw ? targetDate.raw + ' ' : ''}${labelContext}${t.raw}`,
+        label: `${labelType} ${targetDate.raw ? targetDate.raw + ' ' : ''}${labelContext}${t.raw}${isDeadline ? 'まで' : ''}`,
         startStr: formatGoogleDate(startDateObj),
         endStr: formatGoogleDate(endDateObj)
       });
