@@ -4,14 +4,20 @@ async function openCal() {
     const NL = "\n";
     const SELECTOR_CONTENT = 'article > div > div > div:nth-child(3) > div:nth-child(1)';
     const DEFAULT_EVENT_DURATION = 2;
+    const DEFAULT_CALENDAR_ID = '';
 
     // 1. chrome.storage から設定を取得
     let eventDuration = DEFAULT_EVENT_DURATION;
+    let calendarId = DEFAULT_CALENDAR_ID;
     if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
       const storageData = await new Promise((resolve) => {
-        chrome.storage.sync.get({ eventDuration: DEFAULT_EVENT_DURATION }, resolve);
+        chrome.storage.sync.get({ 
+          eventDuration: DEFAULT_EVENT_DURATION,
+          calendarId: DEFAULT_CALENDAR_ID
+        }, resolve);
       });
       eventDuration = storageData.eventDuration;
+      calendarId = storageData.calendarId;
     }
 
     let TITLE = "予定あり";
@@ -77,6 +83,11 @@ async function openCal() {
     }
   
     var url = BASE_URL + encodeURIComponent(TITLE) + "&details=" + encodeURIComponent(TEXT) + "&location=" + encodeURIComponent(TWEET_URL) + "&dates=" + startStr + "%2F" + endStr;
+
+    if (calendarId) {
+      url += "&src=" + encodeURIComponent(calendarId);
+    }
+
     open(url, "_blank");
   }
 }

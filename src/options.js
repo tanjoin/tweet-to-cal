@@ -1,21 +1,26 @@
 // デフォルト値
 const DEFAULT_EVENT_DURATION = 2;
+const DEFAULT_CALENDAR_ID = '';
 
 // 設定を読み込む
 function loadOptions() {
   chrome.storage.sync.get({
-    eventDuration: DEFAULT_EVENT_DURATION
+    eventDuration: DEFAULT_EVENT_DURATION,
+    calendarId: DEFAULT_CALENDAR_ID
   }, function(items) {
     document.getElementById('eventDuration').value = items.eventDuration;
+    document.getElementById('calendarId').value = items.calendarId;
   });
 }
 
 // 設定を保存する
 function saveOptions() {
   const eventDuration = parseFloat(document.getElementById('eventDuration').value);
+  const calendarId = document.getElementById('calendarId').value.trim();
   
   chrome.storage.sync.set({
-    eventDuration: eventDuration
+    eventDuration: eventDuration,
+    calendarId: calendarId
   }, function() {
     // 保存完了メッセージを表示
     const statusMessage = document.getElementById('statusMessage');

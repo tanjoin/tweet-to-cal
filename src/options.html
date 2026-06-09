@@ -45,9 +45,25 @@
       border-radius: 4px;
       background-color: white;
       cursor: pointer;
+      box-sizing: border-box;
     }
     
     select:focus {
+      outline: none;
+      border-color: #4285f4;
+      box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.1);
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 10px;
+      font-size: 16px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+
+    input[type="text"]:focus {
       outline: none;
       border-color: #4285f4;
       box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.1);
@@ -98,7 +114,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>設定</h1>
+    <h1>設定 - X to Calendar</h1>
     
     <div class="setting-group">
       <label for="eventDuration">イベントの長さ</label>
@@ -155,6 +171,15 @@
       </select>
       <div class="description">
         カレンダーに作成されるイベントの長さを設定します。開始時刻と終了時刻の差がこの時間になります。
+      </div>
+    </div>
+
+    <div class="setting-group">
+      <label for="calendarId">Googleカレンダー</label>
+      <input type="text" id="calendarId" placeholder="カレンダーIDを入力（例: xxx@group.calendar.google.com）" class="setting-input">
+      <div class="description">
+        特定のカレンダーに登録したい場合は、Googleカレンダーの「設定と共有」から確認できる<strong>カレンダーID</strong>（例: <code>xxx@gmail.com</code> や <code>xxx@group.calendar.google.com</code>）を入力してください。<br>
+空欄のままにすると、通常通りお使いのメインカレンダーに登録されます。
       </div>
     </div>
     
